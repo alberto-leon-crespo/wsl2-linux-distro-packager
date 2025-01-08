@@ -30,8 +30,8 @@ The script provides:
 1. **Clone or Download the Script**  
    Open Ubuntu from the Microsoft Store and clone the repository:
    ```bash
-   git clone https://github.com/your-repo-name/wsl2-distro-packager.git
-   cd wsl2-distro-packager/bin
+   https://github.com/alberto-leon-crespo/wsl2-linux-distro-packager.git
+   cd wsl2-linux-distro-packager/bin
    ```
 
 2. **Ensure Required Tools Are Installed**  
