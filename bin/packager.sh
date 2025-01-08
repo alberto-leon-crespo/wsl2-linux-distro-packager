@@ -39,36 +39,58 @@ else
 fi
 
 # Prepare directories
-MOUNT_DIR="$OUTPUT_DIR/mount"
-ROOTFS_DIR="$OUTPUT_DIR/rootfs"
-mkdir -p "$MOUNT_DIR" "$ROOTFS_DIR"
+MOUNT_DIR="/mnt/iso"
+mkdir -p "$MOUNT_DIR"
 
 # Mount the ISO
 echo "Mounting the ISO..."
 sudo mount -o loop "$ISO_PATH" "$MOUNT_DIR"
 
-# Extract the root filesystem
-echo "Extracting the root filesystem..."
-sudo unsquashfs -f -d "$ROOTFS_DIR" "$MOUNT_DIR/casper/filesystem.squashfs"
+# Detect SquashFS or initrd
+echo "Checking ISO structure..."
+SQUASHFS_FILE=$(find "$MOUNT_DIR" -name "*.squashfs" | head -n 1)
+INITRD_GZ_FILE=$(find "$MOUNT_DIR" -name "initrd*.gz" | head -n 1)
+INITRD_IMG_FILE=$(find "$MOUNT_DIR" -name "initrd*.img" | head -n 1)
+
+if [ -n "$SQUASHFS_FILE" ]; then
+    echo "Detected SquashFS: $SQUASHFS_FILE"
+    echo "Extracting SquashFS..."
+    sudo unsquashfs -f -d "$OUTPUT_DIR" "$SQUASHFS_FILE"
+elif [ -n "$INITRD_GZ_FILE" ]; then
+    echo "Detected ISO Linux (initrd.gz): $INITRD_GZ_FILE"
+    echo "Extracting initrd.gz..."
+    # Copy and decompress initrd.gz
+    cp "$INITRD_GZ_FILE" "$OUTPUT_DIR/initrd.gz"
+    gunzip -f "$OUTPUT_DIR/initrd.gz"
+    cd "$OUTPUT_DIR"
+    cpio -idmv < initrd
+    cd -
+elif [ -n "$INITRD_IMG_FILE" ]; then
+    echo "Detected ISO Linux (initrd.img): $INITRD_IMG_FILE"
+    echo "Extracting initrd.img..."
+    # Copy and extract initrd.img
+    cp "$INITRD_IMG_FILE" "$OUTPUT_DIR/initrd.img"
+    cd "$OUTPUT_DIR"
+    cpio -idmv < initrd.img
+    cd -
+else
+    echo "Error: Could not find SquashFS or initrd in the ISO."
+    sudo umount "$MOUNT_DIR"
+    exit 1
+fi
+
+echo "Deleting downloaded iso file..."
+rm "$OUTPUT_DIR/distro.iso"
 
 # Unmount the ISO
 echo "Unmounting the ISO..."
 sudo umount "$MOUNT_DIR"
 
-# Clean up the root filesystem
-echo "Cleaning up the root filesystem..."
-sudo rm -rf "$ROOTFS_DIR/var/cache/apt/archives/*"
-sudo rm -rf "$ROOTFS_DIR/tmp/*"
-sudo rm -rf "$ROOTFS_DIR/proc" "$ROOTFS_DIR/sys" "$ROOTFS_DIR/dev"
-
 # Package into a .tar.gz file
 echo "Packaging the root filesystem into $TAR_NAME..."
-cd "$ROOTFS_DIR"
+cd "$OUTPUT_DIR"
 sudo tar --exclude='proc' --exclude='sys' --exclude='dev' --exclude='tmp' -czvf "../$TAR_NAME" .
 cd -
-
-# Final cleanup
-sudo rm -rf "$MOUNT_DIR" "$ROOTFS_DIR"
 
 # Ask if the user wants to import automatically into WSL
 echo "The .tar.gz file is located at $OUTPUT_DIR/$TAR_NAME."
