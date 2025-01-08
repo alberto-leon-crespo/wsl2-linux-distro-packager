@@ -46,50 +46,36 @@ mkdir -p "$MOUNT_DIR"
 echo "Mounting the ISO..."
 sudo mount -o loop "$ISO_PATH" "$MOUNT_DIR"
 
-# Detect SquashFS or initrd
+# Detect SquashFS or ISO Linux
 echo "Checking ISO structure..."
 SQUASHFS_FILE=$(find "$MOUNT_DIR" -name "*.squashfs" | head -n 1)
-INITRD_GZ_FILE=$(find "$MOUNT_DIR" -name "initrd*.gz" | head -n 1)
-INITRD_IMG_FILE=$(find "$MOUNT_DIR" -name "initrd*.img" | head -n 1)
+INITRD_FILE=$(find "$MOUNT_DIR" -name "initrd*" | head -n 1)
 
 if [ -n "$SQUASHFS_FILE" ]; then
     echo "Detected SquashFS: $SQUASHFS_FILE"
     echo "Extracting SquashFS..."
     sudo unsquashfs -f -d "$OUTPUT_DIR" "$SQUASHFS_FILE"
-elif [ -n "$INITRD_GZ_FILE" ]; then
-    echo "Detected ISO Linux (initrd.gz): $INITRD_GZ_FILE"
-    echo "Extracting initrd.gz..."
-    # Copy and decompress initrd.gz
-    cp "$INITRD_GZ_FILE" "$OUTPUT_DIR/initrd.gz"
-    gunzip -f "$OUTPUT_DIR/initrd.gz"
-    cd "$OUTPUT_DIR"
-    cpio -idmv < initrd
-    cd -
-elif [ -n "$INITRD_IMG_FILE" ]; then
-    echo "Detected ISO Linux (initrd.img): $INITRD_IMG_FILE"
-    echo "Extracting initrd.img..."
-    # Copy and extract initrd.img
-    cp "$INITRD_IMG_FILE" "$OUTPUT_DIR/initrd.img"
-    cd "$OUTPUT_DIR"
-    cpio -idmv < initrd.img
-    cd -
+elif [ -n "$INITRD_FILE" ]; then
+    echo "Error: Detected ISO Linux (initrd), which is not supported. This script only works with systems using SquashFS."
+    sudo umount "$MOUNT_DIR"
+    exit 1
 else
-    echo "Error: Could not find SquashFS or initrd in the ISO."
+    echo "Error: Could not find SquashFS or a supported filesystem in the ISO."
     sudo umount "$MOUNT_DIR"
     exit 1
 fi
-
-echo "Deleting downloaded iso file..."
-rm "$OUTPUT_DIR/distro.iso"
 
 # Unmount the ISO
 echo "Unmounting the ISO..."
 sudo umount "$MOUNT_DIR"
 
+echo "Deleting $OUTPUT_DIR/distro.iso"
+rm "$OUTPUT_DIR/distro.iso"
+
 # Package into a .tar.gz file
 echo "Packaging the root filesystem into $TAR_NAME..."
 cd "$OUTPUT_DIR"
-sudo tar --exclude='proc' --exclude='sys' --exclude='dev' --exclude='tmp' -czvf "../$TAR_NAME" .
+sudo tar --exclude='proc' --exclude='sys' --exclude='dev' --exclude='tmp' -czvf "../wsl-distro/$TAR_NAME" .
 cd -
 
 # Ask if the user wants to import automatically into WSL
