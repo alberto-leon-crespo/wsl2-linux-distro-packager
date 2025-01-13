@@ -85,11 +85,19 @@ read -p "Do you want to automatically import this distribution into WSL2? (y/n):
 if [ "$import_choice" == "y" ]; then
     read -p "Enter a name for the distribution (e.g., LinuxMint): " distro_name
     read -p "Enter the destination path in Windows (e.g., C:\\WSL\\$distro_name): " windows_path
-    wsl --import "$distro_name" "$windows_path" "$OUTPUT_DIR/$TAR_NAME" --version 2
+    read -p "Enter your Windows username: " windows_username
+    windows_distro_path="/mnt/c/Users/$windows_username/$distro_name.tar.gz"
+    echo "Copying distro file to users folder on $windows_distro_path -> C:\\Users\\$windows_username"
+    cp -v ./wsl-distro/wsl-distro.tar.gz $windows_distro_path
+    echo "wsl.exe --import $distro_name $windows_path C:\\Users\\$windows_username\\$distro_name.tar.gz"
+    wsl.exe --import "$distro_name" "$windows_path" "C:\\Users\\$windows_username\\$distro_name.tar.gz" --version 2
     echo "Distribution successfully imported as $distro_name in WSL2!"
 else
     echo "To import manually, use this command:"
     echo "wsl --import <Name> <Destination_Path> $OUTPUT_DIR/$TAR_NAME --version 2"
 fi
+
+echo "Cleaning up working directory...."
+rm -rfv $OUTPUT_DIR/*
 
 echo "All done!"
